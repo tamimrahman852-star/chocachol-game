@@ -69,6 +69,7 @@
           <option value="rect">Whole middle rectangle (triangles only)</option>
         </select>
         <p class="text-xs text-slate-400 mt-1">Those points can only be reached by a move/jump, never by placing from your hand.</p></div>
+      <label class="flex gap-3 items-start"><input id="noCorner" type="checkbox" class="mt-1 w-5 h-5"><span><b>No placing on the 4 corners</b><br><span class="text-xs text-slate-400">The four corner points of the middle rectangle can only be reached by a move/jump.</span></span></label>
       <label class="flex gap-3 items-start"><input id="capOnly" type="checkbox" class="mt-1 w-5 h-5"><span><b>Place first, move later</b><br><span class="text-xs text-slate-400">While you still hold tokens, board tokens may only move to capture.</span></span></label>
       <label class="flex gap-3 items-start"><input id="chain" type="checkbox" class="mt-1 w-5 h-5"><span><b>Chain jumps</b><br><span class="text-xs text-slate-400">After a capture jump, keep jumping with the same token to eat more in one turn.</span></span></label>
       <label class="flex gap-3 items-start"><input id="trap" type="checkbox" class="mt-1 w-5 h-5"><span><b>Trap capture</b><br><span class="text-xs text-slate-400">Enemy tokens in a straight line between your landed/placed token and another of yours are all eaten.</span></span></label>
@@ -120,7 +121,7 @@ for(let b=0;b<NN;b++){
 
 // ---------- Settings & state ----------
 const NAMES=['Player 1','Player 2'];
-const DEF={n:[12,12],c:['#2563eb','#22c55e'],ban:'center',capOnly:true,chain:true,trap:false,must:false};
+const DEF={n:[12,12],c:['#2563eb','#22c55e'],ban:'center',noCorner:true,capOnly:true,chain:true,trap:false,must:false};
 let S;
 try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem('chocachol')||'{}'));}catch(e){S={...DEF};}
 let tok, st, logs, toastT;
@@ -128,7 +129,8 @@ const $=id=>document.getElementById(id);
 const log=m=>{logs.unshift(m);if(logs.length>80)logs.pop();};
 const onBoard=p=>tok.reduce((s,t)=>s+(t===p),0);
 const left=p=>st.hand[p]+onBoard(p);
-const banned=n=>S.ban==='center'?n===gid(2,2):S.ban==='inner'?(n<25&&n%5>=1&&n%5<=3&&Math.floor(n/5)>=1&&Math.floor(n/5)<=3):S.ban==='rect'?n<25:false;
+const CORNERS=[gid(0,0),gid(4,0),gid(0,4),gid(4,4)];
+const banned=n=>(S.noCorner&&CORNERS.includes(n))||(S.ban==='center'?n===gid(2,2):S.ban==='inner'?(n<25&&n%5>=1&&n%5<=3&&Math.floor(n/5)>=1&&Math.floor(n/5)<=3):S.ban==='rect'?n<25:false);
 
 function newGame(){
   tok=Array(NN).fill(-1);
@@ -280,14 +282,14 @@ function render(){
 // ---------- Settings screen ----------
 function fillForm(){
   [0,1].forEach(i=>{$('n'+i).value=S.n[i];$('col'+i).value=S.c[i];});
-  $('ban').value=S.ban;['capOnly','chain','trap','must'].forEach(k=>$(k).checked=!!S[k]);$('err').textContent='';
+  $('ban').value=S.ban;['noCorner','capOnly','chain','trap','must'].forEach(k=>$(k).checked=!!S[k]);$('err').textContent='';
 }
 function applySettings(){
   const a=Number($('n0').value),b=Number($('n1').value);
   if(!Number.isInteger(a)||!Number.isInteger(b)||a<1||b<1||a>MAXT||b>MAXT||a+b>NN-1){
     $('err').textContent=`Tokens must be whole numbers from 1 to ${MAXT} each (total at most ${NN-1}).`;return;
   }
-  S={n:[a,b],c:[$('col0').value,$('col1').value],ban:$('ban').value,capOnly:$('capOnly').checked,chain:$('chain').checked,trap:$('trap').checked,must:$('must').checked};
+  S={n:[a,b],c:[$('col0').value,$('col1').value],ban:$('ban').value,noCorner:$('noCorner').checked,capOnly:$('capOnly').checked,chain:$('chain').checked,trap:$('trap').checked,must:$('must').checked};
   try{localStorage.setItem('chocachol',JSON.stringify(S));}catch(e){}
   newGame();$('settings').classList.add('hidden');
 }
