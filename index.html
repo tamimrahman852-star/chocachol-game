@@ -2,56 +2,84 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chocachol – Board Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<title>Chocachol</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  body{background:linear-gradient(135deg,#0f172a,#1e1b4b);min-height:100vh}
-  .wood{background:linear-gradient(135deg,#e39b62,#c97b45);border-radius:18px;box-shadow:0 20px 50px #0008;padding:8px}
+  html,body{height:100%;overscroll-behavior:none}
+  body{background:linear-gradient(135deg,#0f172a,#1e1b4b)}
+  .wood{background:linear-gradient(135deg,#e39b62,#c97b45);border-radius:16px;box-shadow:0 12px 30px #0008;padding:6px}
   .pc,.hint,.boom{transform-box:fill-box;transform-origin:center}
   .pc{transition:all .2s}
   .pc.pop{animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+  .pc.glow{animation:pulse .9s infinite}
   .hint{animation:pulse .9s infinite}
   .boom{animation:boom .8s forwards;pointer-events:none}
   @keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
-  @keyframes pulse{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.35);opacity:.6}}
+  @keyframes pulse{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.3);opacity:.65}}
   @keyframes boom{0%{transform:scale(1);opacity:1}100%{transform:scale(3.2);opacity:0}}
   #toast{transition:all .3s;transform:translate(-50%,-30px);opacity:0;pointer-events:none}
   #toast.show{transform:translate(-50%,0);opacity:1}
-  svg{touch-action:manipulation}
+  svg{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  button{-webkit-tap-highlight-color:transparent}
 </style>
 </head>
-<body class="text-slate-100 p-3 sm:p-6">
-<div id="toast" class="fixed top-4 left-1/2 z-50 bg-rose-600 text-white font-bold px-5 py-3 rounded-xl shadow-2xl text-center"></div>
-<div class="max-w-5xl mx-auto">
-  <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-1 bg-clip-text text-transparent bg-gradient-to-r from-amber-300 to-pink-400">♟ Chocachol</h1>
-  <p class="text-center text-slate-400 text-sm mb-3">Place or move tokens, trap the opponent and capture them in bulk!</p>
-  <div id="banner" class="rounded-xl text-center font-bold py-2 mb-4 bg-slate-800"></div>
+<body class="text-slate-100">
+<div id="toast" class="fixed top-16 left-1/2 z-50 bg-rose-600 text-white font-bold px-4 py-2 rounded-xl shadow-2xl text-center text-sm max-w-[90vw]"></div>
 
-  <div class="flex flex-col lg:flex-row gap-5 items-center lg:items-start justify-center">
-    <div class="wood w-full" style="max-width:430px"><svg id="svg" viewBox="60 65 450 785" class="w-full h-auto" style="max-height:82vh"></svg></div>
+<!-- GAME SCREEN -->
+<div class="h-[100dvh] max-w-md mx-auto flex flex-col p-2 gap-2">
+  <div class="flex items-center gap-2">
+    <button id="gear" aria-label="Settings" class="w-11 h-11 shrink-0 rounded-xl bg-slate-800 active:bg-slate-700 text-2xl">⚙️</button>
+    <div id="banner" class="flex-1 rounded-xl text-center font-bold py-2 bg-slate-800 text-sm"></div>
+  </div>
+  <div id="chips" class="grid grid-cols-2 gap-2"></div>
+  <div class="wood flex-1 min-h-0"><svg id="svg" viewBox="60 65 450 785" class="w-full h-full"></svg></div>
+  <div class="flex items-center gap-2 min-h-[2.5rem] pb-1">
+    <div id="msg" class="flex-1 text-xs text-slate-300 leading-snug"></div>
+    <button id="endturn" class="hidden bg-amber-500 active:bg-amber-400 text-slate-900 font-bold rounded-lg px-4 py-2 text-sm">⏭ End turn</button>
+  </div>
+</div>
 
-    <div class="w-full max-w-[430px] lg:w-96 space-y-3">
-      <div class="bg-slate-800/80 rounded-2xl p-4">
-        <h2 class="font-bold mb-2">⚙ Players &amp; Token Count</h2>
-        <div id="cards" class="space-y-2"></div>
-        <div class="flex flex-wrap items-center gap-2 mt-3 text-sm">
-          <span class="text-slate-400">Quick (both players):</span>
-          <button data-v="12" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">12</button>
-          <button data-v="22" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">22</button>
-          <button data-v="32" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">32</button>
-          <button data-v="36" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">36</button>
-        </div>
-        <p id="err" class="text-rose-400 text-xs mt-2 min-h-[1rem]"></p>
-        <button id="start" class="w-full mt-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-lg py-2 font-bold">▶ Start Game</button>
-        <p class="text-xs text-slate-400 mt-2">Each turn: <b>place</b> a token from your hand on any empty point, <b>or move</b> a board token one step along a line, or jump over an enemy token to capture it. If your placed/landed token leaves a run of enemy tokens in a straight line between it and another of your tokens, <b>all</b> of them are captured at once.</p>
-      </div>
-      <div class="bg-slate-800/80 rounded-2xl p-4">
-        <h2 class="font-bold mb-2">📜 Game Log</h2>
-        <div id="log" class="text-sm space-y-1 h-40 overflow-y-auto"></div>
-      </div>
-      <button id="reset" class="w-full bg-rose-600 hover:bg-rose-500 rounded-lg py-2 font-bold">🔄 Reset Game</button>
+<!-- SETTINGS SCREEN -->
+<div id="settings" class="hidden fixed inset-0 z-40 bg-slate-950 overflow-y-auto">
+  <div class="max-w-md mx-auto p-4 space-y-4 pb-10">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-bold">⚙️ Settings</h2>
+      <button id="close" aria-label="Close" class="w-10 h-10 rounded-lg bg-slate-800 text-xl">✕</button>
     </div>
+
+    <section class="bg-slate-800/80 rounded-2xl p-4 space-y-3">
+      <h3 class="font-bold">👥 Players &amp; Tokens</h3>
+      <div class="flex items-center gap-2"><input id="col0" type="color" class="w-9 h-9 rounded bg-transparent border-0"><span class="flex-1 font-semibold text-sm">Player 1</span><label class="text-xs text-slate-400">Tokens</label><input id="n0" type="number" min="1" max="36" class="w-16 bg-slate-700 rounded px-2 py-1 text-center"></div>
+      <div class="flex items-center gap-2"><input id="col1" type="color" class="w-9 h-9 rounded bg-transparent border-0"><span class="flex-1 font-semibold text-sm">Player 2</span><label class="text-xs text-slate-400">Tokens</label><input id="n1" type="number" min="1" max="36" class="w-16 bg-slate-700 rounded px-2 py-1 text-center"></div>
+      <div class="flex flex-wrap items-center gap-2 text-sm"><span class="text-slate-400">Both:</span>
+        <button data-v="12" class="pre bg-slate-700 rounded px-3 py-1">12</button><button data-v="22" class="pre bg-slate-700 rounded px-3 py-1">22</button>
+        <button data-v="32" class="pre bg-slate-700 rounded px-3 py-1">32</button><button data-v="36" class="pre bg-slate-700 rounded px-3 py-1">36</button></div>
+    </section>
+
+    <section class="bg-slate-800/80 rounded-2xl p-4 space-y-3 text-sm">
+      <h3 class="font-bold">📏 Rules</h3>
+      <div><label class="block font-semibold mb-1">No direct placing in…</label>
+        <select id="ban" class="w-full bg-slate-700 rounded px-2 py-2">
+          <option value="none">Nowhere (place anywhere)</option>
+          <option value="center">Center point only</option>
+          <option value="inner">Middle 3×3 area</option>
+          <option value="rect">Whole middle rectangle (triangles only)</option>
+        </select>
+        <p class="text-xs text-slate-400 mt-1">Those points can only be reached by a move/jump, never by placing from your hand.</p></div>
+      <label class="flex gap-3 items-start"><input id="capOnly" type="checkbox" class="mt-1 w-5 h-5"><span><b>Place first, move later</b><br><span class="text-xs text-slate-400">While you still hold tokens, board tokens may only move to capture.</span></span></label>
+      <label class="flex gap-3 items-start"><input id="chain" type="checkbox" class="mt-1 w-5 h-5"><span><b>Chain jumps</b><br><span class="text-xs text-slate-400">After a capture jump, keep jumping with the same token to eat more in one turn.</span></span></label>
+      <label class="flex gap-3 items-start"><input id="trap" type="checkbox" class="mt-1 w-5 h-5"><span><b>Trap capture</b><br><span class="text-xs text-slate-400">Enemy tokens in a straight line between your landed/placed token and another of yours are all eaten.</span></span></label>
+      <label class="flex gap-3 items-start"><input id="must" type="checkbox" class="mt-1 w-5 h-5"><span><b>Capture is compulsory</b><br><span class="text-xs text-slate-400">If you can capture, you must.</span></span></label>
+    </section>
+
+    <p id="err" class="text-rose-400 text-sm min-h-[1rem]"></p>
+    <button id="apply" class="w-full bg-emerald-600 active:bg-emerald-500 rounded-xl py-3 font-bold">🔄 Apply &amp; Reset Game</button>
+
+    <section class="bg-slate-800/80 rounded-2xl p-4"><h3 class="font-bold mb-2">📜 Game Log</h3>
+      <div id="log" class="text-sm space-y-1 max-h-48 overflow-y-auto"></div></section>
   </div>
 </div>
 
@@ -90,30 +118,34 @@ for(let b=0;b<NN;b++){
   }
 }
 
-// ---------- State ----------
-const PL=[{n:'Player 1',c:'#2563eb'},{n:'Player 2',c:'#22c55e'}];
+// ---------- Settings & state ----------
+const NAMES=['Player 1','Player 2'];
+const DEF={n:[12,12],c:['#2563eb','#22c55e'],ban:'center',capOnly:true,chain:true,trap:false,must:false};
+let S;
+try{S=Object.assign({},DEF,JSON.parse(localStorage.getItem('chocachol')||'{}'));}catch(e){S={...DEF};}
 let tok, st, logs, toastT;
 const $=id=>document.getElementById(id);
 const log=m=>{logs.unshift(m);if(logs.length>80)logs.pop();};
 const onBoard=p=>tok.reduce((s,t)=>s+(t===p),0);
 const left=p=>st.hand[p]+onBoard(p);
+const banned=n=>S.ban==='center'?n===gid(2,2):S.ban==='inner'?(n<25&&n%5>=1&&n%5<=3&&Math.floor(n/5)>=1&&Math.floor(n/5)<=3):S.ban==='rect'?n<25:false;
 
-function init(){
+function newGame(){
   tok=Array(NN).fill(-1);
-  st={phase:'config',turn:0,pick:null,last:null,flash:[],hand:[0,0],cap:[0,0],winner:-2};
-  logs=[];log('Choose the token count for each player, then press Start.');
-  $('err').textContent='';render();
+  st={phase:'play',turn:0,pick:null,chain:false,last:null,flash:[],hand:[S.n[0],S.n[1]],cap:[0,0],tc:0,winner:-2,msg:''};
+  logs=[];log(`Game started: ${S.n[0]} vs ${S.n[1]} tokens. ${NAMES[0]} goes first.`);
+  render();
 }
 
 // ---------- Rules ----------
-function movesOf(i){
+function movesOf(i,capOnly){
   const p=tok[i],r=[];
-  adj[i].forEach(j=>{if(tok[j]<0)r.push({to:j});});
+  if(!capOnly)adj[i].forEach(j=>{if(tok[j]<0)r.push({to:j});});
   jumps[i].forEach(({over,to})=>{if(tok[over]===1-p&&tok[to]<0)r.push({to,cap:over});});
   return r;
 }
-// Trap capture: from the landing point, in every straight direction, a run of enemy
-// tokens that ends at one of your own tokens is captured entirely.
+const lockOf=p=>S.capOnly&&st.hand[p]>0;
+const anyCap=p=>tok.some((t,i)=>t===p&&movesOf(i,true).length>0);
 function sandwich(L,p){
   const out=new Set();
   adj[L].forEach(j=>{
@@ -124,64 +156,84 @@ function sandwich(L,p){
   return out;
 }
 function canAct(p){
-  return (st.hand[p]>0&&tok.some(t=>t<0))||tok.some((t,i)=>t===p&&movesOf(i).length>0);
+  const place=st.hand[p]>0&&tok.some((t,i)=>t<0&&!banned(i));
+  return place||tok.some((t,i)=>t===p&&movesOf(i,lockOf(p)).length>0);
 }
+function say(m){st.msg=m;render();}
 
 function click(n){
   if(st.phase!=='play')return;
-  st.last=null;st.flash=[];
-  const p=st.turn;
-  if(tok[n]===p){st.pick=st.pick===n?null:n;render();return;}
+  const p=st.turn,hand=st.hand[p]>0;
+  st.last=null;st.flash=[];st.msg='';
+  if(st.chain){
+    const m=movesOf(st.pick,true).find(x=>x.to===n);
+    if(m)doMove(m);else say('Jump again with the glowing token, or press End turn.');
+    return;
+  }
+  if(tok[n]===p){
+    st.pick=st.pick===n?null:n;
+    if(st.pick!==null&&lockOf(p)&&!movesOf(n,true).length){render();say(`Finish placing your tokens first — until then board tokens only move to capture.`);return;}
+    render();return;
+  }
   if(tok[n]>=0){render();return;}
   if(st.pick!==null){
-    const m=movesOf(st.pick).find(x=>x.to===n);
+    const m=movesOf(st.pick,lockOf(p)).find(x=>x.to===n);
     if(m){
-      const caps=new Set(m.cap!==undefined?[m.cap]:[]);
-      tok[st.pick]=-1;tok[n]=p;
-      sandwich(n,p).forEach(x=>caps.add(x));
-      finish(n,caps,'moved',m.cap!==undefined?1:0);return;
+      if(S.must&&anyCap(p)&&m.cap===undefined){say('You must capture when you can.');return;}
+      doMove(m);return;
     }
   }
-  if(st.hand[p]>0){
+  if(hand){
+    if(banned(n)){say("Can't place here — this spot can only be reached by a move.");return;}
+    if(S.must&&anyCap(p)){say('You must capture when you can.');return;}
     tok[n]=p;st.hand[p]--;
-    finish(n,sandwich(n,p),'placed',0);return;
+    const caps=S.trap?sandwich(n,p):new Set();
+    apply(n,caps,'placed');
+    if(st.phase==='play')endTurn();
+    return;
   }
   st.pick=null;render();
 }
 
-function finish(at,caps,verb,jumped){
-  const p=st.turn,q=1-p,k=caps.size;
-  caps.forEach(i=>tok[i]=-1);
-  st.cap[p]+=k;st.last=at;st.flash=[...caps];st.pick=null;
-  log(`${PL[p].n} ${verb} a token.`);
-  if(k){
-    const detail=jumped&&k>jumped?` (${jumped} by jump + ${k-jumped} by trapping)`:(jumped?' (by jump)':' (by trapping)');
-    const msg=`${PL[p].n} captured ${k} token${k>1?'s':''} in one move!`;
-    log(`💥 ${msg}${detail}`);toast(msg);
+function doMove(m){
+  const p=st.turn,from=st.pick;
+  tok[from]=-1;tok[m.to]=p;
+  const caps=new Set(m.cap!==undefined?[m.cap]:[]);
+  if(S.trap)sandwich(m.to,p).forEach(x=>caps.add(x));
+  apply(m.to,caps,'moved');
+  if(st.phase!=='play')return;
+  if(S.chain&&m.cap!==undefined&&movesOf(m.to,true).length){
+    st.pick=m.to;st.chain=true;st.msg='Nice! Jump again to eat more, or press End turn.';render();return;
   }
-  if(left(q)===0){st.phase='over';st.winner=p;log(`🏆 ${PL[p].n} wins!`);render();return;}
-  st.turn=q;
+  endTurn();
+}
+
+function apply(at,caps,verb){
+  const p=st.turn,k=caps.size;
+  caps.forEach(i=>tok[i]=-1);
+  st.cap[p]+=k;st.tc+=k;st.last=at;st.flash=[...caps];st.pick=null;
+  log(`${NAMES[p]} ${verb} a token${k?` and ate ${k}`:''}.`);
+  if(left(1-p)===0){
+    st.phase='over';st.winner=p;st.chain=false;flushCaps();log(`🏆 ${NAMES[p]} wins!`);render();
+  }
+}
+function flushCaps(){
+  if(st.tc>0){const m=`${NAMES[st.turn]} captured ${st.tc} token${st.tc>1?'s':''} in one move!`;log(`💥 ${m}`);toast(m);}
+  st.tc=0;
+}
+function endTurn(){
+  const p=st.turn,q=1-p;
+  flushCaps();
+  st.chain=false;st.pick=null;st.turn=q;
   if(!canAct(q)){
-    log(`${PL[q].n} has no legal action — turn skipped.`);st.turn=p;
-    if(!canAct(p)){st.phase='over';st.winner=-1;log('🤝 No one can move — draw!');}
+    log(`${NAMES[q]} has no legal action — turn skipped.`);st.turn=p;
+    if(!canAct(p)){st.phase='over';st.winner=-1;log('🤝 Nobody can move — draw!');}
   }
   render();
 }
-
 function toast(m){
   const t=$('toast');t.textContent='💥 '+m;t.classList.add('show');
   clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);
-}
-
-function start(){
-  const a=Number($('n0').value),b=Number($('n1').value);
-  if(!Number.isInteger(a)||!Number.isInteger(b)||a<1||b<1||a>MAXT||b>MAXT||a+b>NN-1){
-    $('err').textContent=`Enter whole numbers from 1 to ${MAXT} for each player (together at most ${NN-1}; the board has ${NN} points).`;return;
-  }
-  $('err').textContent='';
-  st.hand=[a,b];st.phase='play';st.turn=0;
-  log(`Game started: ${a} tokens for ${PL[0].n}, ${b} for ${PL[1].n}. ${PL[0].n} goes first.`);
-  render();
 }
 
 // ---------- Rendering ----------
@@ -189,59 +241,64 @@ function render(){
   let h='';
   edges.forEach(k=>{const [a,b]=k.split('-').map(Number);h+=`<line x1="${nodes[a].x}" y1="${nodes[a].y}" x2="${nodes[b].x}" y2="${nodes[b].y}" stroke="#111" stroke-width="2.6" stroke-linecap="round"/>`;});
   nodes.forEach(n=>h+=`<circle cx="${n.x}" cy="${n.y}" r="3.5" fill="#111"/>`);
-  const hints=(st.phase==='play'&&st.pick!==null)?movesOf(st.pick):[];
+  const play=st.phase==='play';
+  const hints=(play&&st.pick!==null)?movesOf(st.pick,st.chain||lockOf(st.turn)):[];
   hints.forEach(m=>{const n=nodes[m.to];h+=`<circle class="hint" cx="${n.x}" cy="${n.y}" r="8" fill="${m.cap!==undefined?'#ef4444':'#facc15'}" stroke="#111" stroke-width="1.5"/>`;});
   tok.forEach((t,i)=>{if(t<0)return;const n=nodes[i];
-    h+=`<circle class="pc${st.last===i?' pop':''}" cx="${n.x}" cy="${n.y}" r="12" fill="${PL[t].c}" stroke="#fff" stroke-width="2.5"/>`;
+    h+=`<circle class="pc${st.last===i?' pop':''}${st.chain&&st.pick===i?' glow':''}" cx="${n.x}" cy="${n.y}" r="12" fill="${S.c[t]}" stroke="#fff" stroke-width="2.5"/>`;
     if(st.pick===i)h+=`<circle cx="${n.x}" cy="${n.y}" r="17" fill="none" stroke="#fde047" stroke-width="3" stroke-dasharray="5 4"/>`;});
   st.flash.forEach(i=>h+=`<circle class="boom" cx="${nodes[i].x}" cy="${nodes[i].y}" r="12" fill="none" stroke="#ef4444" stroke-width="4"/>`);
   nodes.forEach((n,i)=>h+=`<circle data-n="${i}" cx="${n.x}" cy="${n.y}" r="15" fill="transparent" style="cursor:pointer"/>`);
   $('svg').innerHTML=h;
 
-  const cfg=st.phase==='config';
-  PL.forEach((p,i)=>{
-    const active=st.phase==='play'&&st.turn===i, c=$('card'+i);
-    c.style.borderColor=active?p.c:'transparent';c.style.background=active?p.c+'33':'#1e293b';
-    $('n'+i).disabled=!cfg;$('col'+i).disabled=!cfg;
-    $('left'+i).innerHTML=cfg?'—':`${left(i)} <span class="text-xs font-normal text-slate-300">left</span>`;
-    $('st'+i).textContent=cfg?'':`Hand ${st.hand[i]} • Board ${onBoard(i)} • Captured ${st.cap[i]}`;
-  });
-  const bn=$('banner'),pl=PL[st.phase==='play'?st.turn:0];
-  if(cfg){bn.textContent='Set the token counts and press Start';bn.style.border='2px solid #475569';}
-  else if(st.phase==='over'){
-    bn.innerHTML=st.winner<0?'🤝 Draw!':`🏆 <span style="color:${PL[st.winner].c}">● ${PL[st.winner].n}</span> wins!`;
-    bn.style.border='2px solid '+(st.winner<0?'#94a3b8':PL[st.winner].c);
+  $('chips').innerHTML=[0,1].map(i=>{
+    const a=play&&st.turn===i;
+    return `<div class="rounded-xl p-2 border-2" style="border-color:${a?S.c[i]:'transparent'};background:${a?S.c[i]+'33':'#1e293b'}">
+      <div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full border-2 border-white" style="background:${S.c[i]}"></span><span class="font-semibold text-sm flex-1">${NAMES[i]}</span><span class="text-xl font-extrabold">${left(i)}</span></div>
+      <div class="text-[11px] text-slate-400">Hand ${st.hand[i]} · Board ${onBoard(i)} · Eaten ${st.cap[i]}</div></div>`;
+  }).join('');
+
+  const bn=$('banner'),p=st.turn;
+  if(st.phase==='over'){
+    bn.innerHTML=st.winner<0?'🤝 Draw!':`🏆 <span style="color:${S.c[st.winner]}">● ${NAMES[st.winner]}</span> wins!`;
+    bn.style.border='2px solid '+(st.winner<0?'#94a3b8':S.c[st.winner]);
   }else{
-    const p=st.turn;
-    bn.innerHTML=`<span style="color:${pl.c}">● ${pl.n}</span>'s turn — ${st.pick!==null?'choose where to move':(st.hand[p]>0?'place a token ('+st.hand[p]+' in hand) or pick one to move':'pick a token to move')}`;
-    bn.style.border='2px solid '+pl.c;
+    bn.innerHTML=`<span style="color:${S.c[p]}">●</span> ${NAMES[p]}'s turn`;bn.style.border='2px solid '+S.c[p];
   }
-  $('start').disabled=!cfg;
+  let msg=st.msg;
+  if(!msg){
+    if(st.phase==='over')msg='Open ⚙️ settings to start a new game.';
+    else if(st.chain)msg='Jump again with the glowing token, or press End turn.';
+    else if(st.hand[p]>0)msg=S.capOnly?`Place a token (${st.hand[p]} in hand). Board tokens can only capture for now.`:`Place a token (${st.hand[p]} in hand) or move one.`;
+    else msg='Select one of your tokens, then tap where to move.';
+  }
+  $('msg').textContent=msg;
+  $('endturn').classList.toggle('hidden',!st.chain);
   $('log').innerHTML=logs.map(m=>`<div class="border-l-2 border-slate-600 pl-2">${m}</div>`).join('');
 }
 
-function buildCards(){
-  const box=$('cards');
-  PL.forEach((p,i)=>{
-    const d=document.createElement('div');d.id='card'+i;
-    d.className='p-2 rounded-xl border-2 transition';
-    d.innerHTML=`<div class="flex items-center gap-2">
-      <input id="col${i}" type="color" value="${p.c}" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0">
-      <span class="flex-1 font-semibold text-sm">${p.n}</span>
-      <label class="text-xs text-slate-400">Tokens</label>
-      <input id="n${i}" type="number" min="1" max="${MAXT}" value="${i?12:12}" class="w-16 bg-slate-700 rounded px-2 py-1 text-center">
-      <span id="left${i}" class="text-lg font-bold w-16 text-right">—</span></div>
-      <div id="st${i}" class="text-xs text-slate-400 mt-1"></div>`;
-    box.appendChild(d);
-    d.querySelector('input[type=color]').oninput=e=>{p.c=e.target.value;render();};
-  });
+// ---------- Settings screen ----------
+function fillForm(){
+  [0,1].forEach(i=>{$('n'+i).value=S.n[i];$('col'+i).value=S.c[i];});
+  $('ban').value=S.ban;['capOnly','chain','trap','must'].forEach(k=>$(k).checked=!!S[k]);$('err').textContent='';
+}
+function applySettings(){
+  const a=Number($('n0').value),b=Number($('n1').value);
+  if(!Number.isInteger(a)||!Number.isInteger(b)||a<1||b<1||a>MAXT||b>MAXT||a+b>NN-1){
+    $('err').textContent=`Tokens must be whole numbers from 1 to ${MAXT} each (total at most ${NN-1}).`;return;
+  }
+  S={n:[a,b],c:[$('col0').value,$('col1').value],ban:$('ban').value,capOnly:$('capOnly').checked,chain:$('chain').checked,trap:$('trap').checked,must:$('must').checked};
+  try{localStorage.setItem('chocachol',JSON.stringify(S));}catch(e){}
+  newGame();$('settings').classList.add('hidden');
 }
 
 $('svg').addEventListener('click',e=>{const t=e.target.closest('[data-n]');if(t)click(+t.dataset.n);});
-document.querySelectorAll('.pre').forEach(b=>b.onclick=()=>{if(st.phase==='config'){$('n0').value=b.dataset.v;$('n1').value=b.dataset.v;}});
-$('start').onclick=start;
-$('reset').onclick=()=>{if(confirm('Reset the whole game?'))init();};
-buildCards();init();
+$('gear').onclick=()=>{fillForm();$('settings').classList.remove('hidden');};
+$('close').onclick=()=>$('settings').classList.add('hidden');
+$('apply').onclick=applySettings;
+$('endturn').onclick=()=>{if(st.chain)endTurn();};
+document.querySelectorAll('.pre').forEach(b=>b.onclick=()=>{$('n0').value=b.dataset.v;$('n1').value=b.dataset.v;});
+newGame();
 </script>
 </body>
 </html>
