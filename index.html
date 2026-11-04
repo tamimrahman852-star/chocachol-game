@@ -78,8 +78,8 @@
         </select>
         <p class="text-xs text-slate-400 mt-1">Those points can only be reached by a move/jump, never by placing from your hand.</p></div>
       <label class="flex gap-3 items-start"><input id="noCorner" type="checkbox" class="mt-1 w-5 h-5"><span><b>No placing on the 4 corners</b><br><span class="text-xs text-slate-400">The four corner points of the middle rectangle can only be reached by a move/jump.</span></span></label>
-      <label class="flex gap-3 items-start"><input id="ghor" type="checkbox" class="mt-1 w-5 h-5"><span><b>Ghor rule (triangles)</b><br><span class="text-xs text-slate-400">No placing from your hand inside a ghor — get in by moving, or by capturing: jump over the ghor's main point from the middle side to land on its middle point. No moving straight from one ghor to another.</span></span></label>
-      <label class="flex gap-3 items-start"><input id="outOfSpots" type="checkbox" class="mt-1 w-5 h-5"><span><b>No place left → hand goes to opponent</b><br><span class="text-xs text-slate-400">If you have no spot to place on at your turn, your hand tokens go to the opponent and you start moving.</span></span></label>
+      <label class="flex gap-3 items-start"><input id="ghor" type="checkbox" class="mt-1 w-5 h-5"><span><b>Ghor rule (triangles)</b><br><span class="text-xs text-slate-400">No placing from your hand inside a ghor — get in by moving, or by capturing: jump over the ghor's main point from the middle side to land on its middle point or on the middle of one of its two sides. No moving straight from one ghor to another.</span></span></label>
+      <label class="flex gap-3 items-start"><input id="outOfSpots" type="checkbox" class="mt-1 w-5 h-5"><span><b>No place left → counted as opponent's eaten</b><br><span class="text-xs text-slate-400">If you have no spot to place on at your turn, your hand tokens are counted as eaten by the opponent and you start moving.</span></span></label>
       <label class="flex gap-3 items-start"><input id="capOnly" type="checkbox" class="mt-1 w-5 h-5"><span><b>Place first, move later</b><br><span class="text-xs text-slate-400">While you still hold tokens, board tokens may only move to capture.</span></span></label>
       <label class="flex gap-3 items-start"><input id="chain" type="checkbox" class="mt-1 w-5 h-5"><span><b>Chain jumps</b><br><span class="text-xs text-slate-400">After a capture jump, keep jumping with the same token to eat more in one turn.</span></span></label>
       <label class="flex gap-3 items-start"><input id="trap" type="checkbox" class="mt-1 w-5 h-5"><span><b>Trap capture</b><br><span class="text-xs text-slate-400">Enemy tokens in a straight line between your landed/placed token and another of yours are all eaten.</span></span></label>
@@ -109,12 +109,12 @@ for(let r=0;r<5;r++)for(let c=0;c<5;c++){
   if(r<4)addE(gid(c,r),gid(c,r+1));
   if((r+c)%2===0)[[1,1],[1,-1]].forEach(([dc,dr])=>{const c2=c+dc,r2=r+dr;if(c2>=0&&c2<5&&r2>=0&&r2<5)addE(gid(c,r),gid(c2,r2));});
 }
-const ghorOf=Array(25).fill(-1),tris=[];let gcount=0;
+const ghorOf=Array(25).fill(-1),tris=[],ghorInfo=[];let gcount=0;
 function tri(a,P,Q){
   const A=[nodes[a].x,nodes[a].y], mid=(p,q)=>[(p[0]+q[0])/2,(p[1]+q[1])/2];
   const BM=mid(P,Q), pts=[P,BM,Q,mid(A,P),mid(A,Q),mid(A,BM)];
   const [bl,bm,br,ml,mr,m]=pts.map(p=>{nodes.push({x:p[0],y:p[1]});return nodes.length-1;});
-  [bl,bm,br,ml,mr,m].forEach(k=>ghorOf[k]=gcount);gcount++;tris.push([A,P,Q]);
+  [bl,bm,br,ml,mr,m].forEach(k=>ghorOf[k]=gcount);gcount++;tris.push([A,P,Q]);ghorInfo.push([a,ml,mr]);
   [[a,ml],[ml,bl],[a,mr],[mr,br],[bl,bm],[bm,br],[a,m],[m,bm],[ml,m],[m,mr]].forEach(e=>addE(e[0],e[1]));
 }
 tri(gid(2,0),[197,88],[368,88]);   tri(gid(2,4),[197,825],[368,825]);
@@ -133,6 +133,21 @@ for(let b=0;b<NN;b++){
     if(cr<0.1&&dot<0){jumps[a].push({over:b,to:c});jumps[c].push({over:b,to:a});nx[a][b]=c;nx[c][b]=a;}
   }
 }
+
+// Side-middle entry: capturing the token on a ghor's main point also lets you land on the middle of
+// either side of that ghor (from the best-aligned outside neighbour), for every ghor.
+ghorInfo.forEach(([a,ml,mr])=>[ml,mr].forEach(sm=>{
+  const dx=nodes[sm].x-nodes[a].x,dy=nodes[sm].y-nodes[a].y,dl=Math.hypot(dx,dy);
+  let best=null,bc=0.9;
+  adj[a].forEach(g=>{
+    if(ghorOf[g]>=0)return;
+    const ex=nodes[a].x-nodes[g].x,ey=nodes[a].y-nodes[g].y,c=(ex*dx+ey*dy)/(Math.hypot(ex,ey)*dl);
+    if(c>bc){bc=c;best=g;}
+  });
+  if(best!==null&&!jumps[best].some(j=>j.over===a&&j.to===sm)){
+    jumps[best].push({over:a,to:sm});jumps[sm].push({over:a,to:best});
+  }
+}));
 
 // ---------- Settings & state ----------
 const NAMES=['Player 1','Player 2'];
@@ -169,11 +184,11 @@ function okMove(from,to){
   return !(gt>=0&&gf>=0&&gt!==gf);
 }
 function placeable(){return tok.some((t,i)=>t<0&&!banned(i));}
-// No place left to put tokens: the hand tokens of the player to move go to the opponent (once).
+// No place left to put tokens: the hand tokens of the player to move are counted as eaten by the opponent.
 function settle(q){
-  if(S.outOfSpots&&!st.exhausted&&st.hand[q]>0&&!placeable()){
-    const o=1-q,k=st.hand[q];st.hand[o]+=k;st.hand[q]=0;st.exhausted=true;
-    const m=`${NAMES[q]} has no place left — ${k} hand token${k>1?'s':''} go to ${NAMES[o]}!`;
+  if(S.outOfSpots&&st.hand[q]>0&&!placeable()){
+    const o=1-q,k=st.hand[q];st.cap[o]+=k;st.hand[q]=0;
+    const m=`${NAMES[q]} has no place left — ${k} hand token${k>1?'s':''} counted as eaten by ${NAMES[o]}!`;
     log('🔁 '+m);toast(m);
   }
 }
