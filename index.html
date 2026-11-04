@@ -78,7 +78,7 @@
         </select>
         <p class="text-xs text-slate-400 mt-1">Those points can only be reached by a move/jump, never by placing from your hand.</p></div>
       <label class="flex gap-3 items-start"><input id="noCorner" type="checkbox" class="mt-1 w-5 h-5"><span><b>No placing on the 4 corners</b><br><span class="text-xs text-slate-400">The four corner points of the middle rectangle can only be reached by a move/jump.</span></span></label>
-      <label class="flex gap-3 items-start"><input id="ghor" type="checkbox" class="mt-1 w-5 h-5"><span><b>Ghor rule (triangles)</b><br><span class="text-xs text-slate-400">A ghor can only be entered by capturing (jumping in). No placing inside ghors, no moving straight from one ghor to another.</span></span></label>
+      <label class="flex gap-3 items-start"><input id="ghor" type="checkbox" class="mt-1 w-5 h-5"><span><b>Ghor rule (triangles)</b><br><span class="text-xs text-slate-400">No placing from your hand inside a ghor — get in by moving, or by capturing: jump over the ghor's main point from the middle side to land on its middle point. No moving straight from one ghor to another.</span></span></label>
       <label class="flex gap-3 items-start"><input id="outOfSpots" type="checkbox" class="mt-1 w-5 h-5"><span><b>No place left → hand goes to opponent</b><br><span class="text-xs text-slate-400">If you have no spot to place on at your turn, your hand tokens go to the opponent and you start moving.</span></span></label>
       <label class="flex gap-3 items-start"><input id="capOnly" type="checkbox" class="mt-1 w-5 h-5"><span><b>Place first, move later</b><br><span class="text-xs text-slate-400">While you still hold tokens, board tokens may only move to capture.</span></span></label>
       <label class="flex gap-3 items-start"><input id="chain" type="checkbox" class="mt-1 w-5 h-5"><span><b>Chain jumps</b><br><span class="text-xs text-slate-400">After a capture jump, keep jumping with the same token to eat more in one turn.</span></span></label>
@@ -119,8 +119,8 @@ function tri(a,P,Q){
 }
 tri(gid(2,0),[197,88],[368,88]);   tri(gid(2,4),[197,825],[368,825]);
 tri(gid(0,2),[83,325],[83,585]);   tri(gid(4,2),[485,325],[485,585]);
-tri(gid(0,0),[77,196],[155,80]);   tri(gid(4,0),[490,196],[411,80]);
-tri(gid(0,4),[77,717],[155,835]);  tri(gid(4,4),[490,717],[411,835]);
+tri(gid(0,0),[93,200],[157,73]);   tri(gid(4,0),[473,200],[409,73]);
+tri(gid(0,4),[93,713],[157,840]);  tri(gid(4,4),[473,713],[409,840]);
 
 const NN=nodes.length, adj=Array.from({length:NN},()=>[]), jumps=Array.from({length:NN},()=>[]), nx=Array.from({length:NN},()=>({}));
 edges.forEach(k=>{const [a,b]=k.split('-').map(Number);adj[a].push(b);adj[b].push(a);});
@@ -161,13 +161,12 @@ function movesOf(i,capOnly){
   jumps[i].forEach(({over,to})=>{if(tok[over]===1-p&&tok[to]<0&&okMove(i,to,true))r.push({to,cap:over});});
   return r;
 }
-// Ghor (triangle) rule: enter a ghor only by a capture jump; never go straight from one ghor to another.
-function okMove(from,to,isCap){
+// Ghor (triangle) rule: a ghor can be entered by a normal move or by a capture jump (never placed into
+// from the hand); you can never go straight from one ghor into another.
+function okMove(from,to){
   if(!S.ghor)return true;
   const gt=ghorOf[to],gf=ghorOf[from];
-  if(gt<0||gt===gf)return true;
-  if(gf>=0)return false;
-  return isCap;
+  return !(gt>=0&&gf>=0&&gt!==gf);
 }
 function placeable(){return tok.some((t,i)=>t<0&&!banned(i));}
 // No place left to put tokens: the hand tokens of the player to move go to the opponent (once).
