@@ -79,7 +79,7 @@
         <p class="text-xs text-slate-400 mt-1">Those points can only be reached by a move/jump, never by placing from your hand.</p></div>
       <label class="flex gap-3 items-start"><input id="noCorner" type="checkbox" class="mt-1 w-5 h-5"><span><b>No placing on the 4 corners</b><br><span class="text-xs text-slate-400">The four corner points of the middle rectangle can only be reached by a move/jump.</span></span></label>
       <label class="flex gap-3 items-start"><input id="ghor" type="checkbox" class="mt-1 w-5 h-5"><span><b>Ghor rule (triangles)</b><br><span class="text-xs text-slate-400">No placing from your hand inside a ghor — get in by moving, or by capturing: jump over the ghor's main point from the middle side to land on its middle point or on the middle of one of its two sides. No moving straight from one ghor to another.</span></span></label>
-      <label class="flex gap-3 items-start"><input id="outOfSpots" type="checkbox" class="mt-1 w-5 h-5"><span><b>No place left → counted as opponent's eaten</b><br><span class="text-xs text-slate-400">If you have no spot to place on at your turn, your hand tokens are counted as eaten by the opponent and you start moving.</span></span></label>
+      <label class="flex gap-3 items-start"><input id="outOfSpots" type="checkbox" class="mt-1 w-5 h-5"><span><b>No place left → counted as opponent's eaten</b><br><span class="text-xs text-slate-400">If you have no spot to place on at your turn and none of your board tokens can capture, your hand tokens are counted as eaten by the opponent and you start moving. If you can capture, your hand stays safe.</span></span></label>
       <label class="flex gap-3 items-start"><input id="capOnly" type="checkbox" class="mt-1 w-5 h-5"><span><b>Place first, move later</b><br><span class="text-xs text-slate-400">While you still hold tokens, board tokens may only move to capture.</span></span></label>
       <label class="flex gap-3 items-start"><input id="chain" type="checkbox" class="mt-1 w-5 h-5"><span><b>Chain jumps</b><br><span class="text-xs text-slate-400">After a capture jump, keep jumping with the same token to eat more in one turn.</span></span></label>
       <label class="flex gap-3 items-start"><input id="trap" type="checkbox" class="mt-1 w-5 h-5"><span><b>Trap capture</b><br><span class="text-xs text-slate-400">Enemy tokens in a straight line between your landed/placed token and another of yours are all eaten.</span></span></label>
@@ -189,15 +189,16 @@ function okMove(from,to){
   return !(gt>=0&&gf>=0&&gt!==gf);
 }
 function placeable(){return tok.some((t,i)=>t<0&&!banned(i));}
-// No place left to put tokens: the hand tokens of the player to move are counted as eaten by the opponent.
+// No place left to put tokens AND no capture possible: the hand tokens of the player to move are counted as
+// eaten by the opponent. If he can still capture with a board token, his hand stays safe.
 function settle(q){
-  if(S.outOfSpots&&st.hand[q]>0&&!placeable()){
+  if(S.outOfSpots&&st.hand[q]>0&&!placeable()&&!anyCap(q)){
     const o=1-q,k=st.hand[q];st.cap[o]+=k;st.hand[q]=0;
     const m=`${NAMES[q]} has no place left — ${k} hand token${k>1?'s':''} counted as eaten by ${NAMES[o]}!`;
     log('🔁 '+m);toast(m);
   }
 }
-const lockOf=p=>S.capOnly&&st.hand[p]>0&&placeable();
+const lockOf=p=>S.capOnly&&st.hand[p]>0&&(placeable()||anyCap(p));
 const anyCap=p=>tok.some((t,i)=>t===p&&movesOf(i,true).length>0);
 function sandwich(L,p){
   const out=new Set();
@@ -332,6 +333,7 @@ function render(){
   if(!msg){
     if(st.phase==='over')msg=st.superWin?`${NAMES[st.cot]}'s last token is cot — it can't capture or move. Open ⚙️ for a new game.`:'Open ⚙️ settings to start a new game.';
     else if(st.chain)msg='Jump again with the glowing token, or press End turn.';
+    else if(st.hand[p]>0&&!placeable())msg='No place left to put tokens — capture with a board token.';
     else if(st.hand[p]>0)msg=S.capOnly?`Place a token (${st.hand[p]} in hand). Board tokens can only capture for now.`:`Place a token (${st.hand[p]} in hand) or move one.`;
     else msg='Select one of your tokens, then tap where to move.';
   }
