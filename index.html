@@ -117,8 +117,13 @@ function tri(a,P,Q){
   [bl,bm,br,ml,mr,m].forEach(k=>ghorOf[k]=gcount);gcount++;tris.push([A,P,Q]);ghorInfo.push([a,ml,mr]);
   [[a,ml],[ml,bl],[a,mr],[mr,br],[bl,bm],[bm,br],[a,m],[m,bm],[ml,m],[m,mr]].forEach(e=>addE(e[0],e[1]));
 }
-tri(gid(2,0),[197,88],[368,88]);   tri(gid(2,4),[197,825],[368,825]);
-tri(gid(0,2),[83,325],[83,585]);   tri(gid(4,2),[485,325],[485,585]);
+// The sides of the four middle ghors continue the board's diagonal lines exactly, so jumping along a
+// side line lands on the middle of that side, and jumping along the middle line lands on the ghor's middle.
+const ext=(a,g,f)=>[nodes[a].x*(1+f)-nodes[g].x*f,nodes[a].y*(1+f)-nodes[g].y*f];
+tri(gid(2,0),ext(gid(2,0),gid(3,1),.88),ext(gid(2,0),gid(1,1),.88));
+tri(gid(2,4),ext(gid(2,4),gid(3,3),.88),ext(gid(2,4),gid(1,3),.88));
+tri(gid(0,2),ext(gid(0,2),gid(1,3),.97),ext(gid(0,2),gid(1,1),.97));
+tri(gid(4,2),ext(gid(4,2),gid(3,3),.97),ext(gid(4,2),gid(3,1),.97));
 tri(gid(0,0),[93,200],[157,73]);   tri(gid(4,0),[473,200],[409,73]);
 tri(gid(0,4),[93,713],[157,840]);  tri(gid(4,4),[473,713],[409,840]);
 
