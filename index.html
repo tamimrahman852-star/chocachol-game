@@ -88,12 +88,14 @@
 
     <section class="bg-slate-800/80 rounded-2xl p-4 space-y-2 text-sm"><h3 class="font-bold">📲 Install App</h3>
       <button id="install" class="hidden w-full bg-indigo-600 active:bg-indigo-500 rounded-xl py-2 font-bold">Install Chocachol</button>
+      <button id="upd" class="w-full bg-slate-700 active:bg-slate-600 rounded-xl py-2 font-bold">🔄 Update app (load latest version)</button>
       <p class="text-xs text-slate-400">Android (Chrome): menu ⋮ → Install app. iPhone (Safari): Share → Add to Home Screen. Works offline after the first load.</p></section>
     <p id="err" class="text-rose-400 text-sm min-h-[1rem]"></p>
     <button id="apply" class="w-full bg-emerald-600 active:bg-emerald-500 rounded-xl py-3 font-bold">🔄 Apply &amp; Reset Game</button>
 
     <section class="bg-slate-800/80 rounded-2xl p-4"><h3 class="font-bold mb-2">📜 Game Log</h3>
       <div id="log" class="text-sm space-y-1 max-h-48 overflow-y-auto"></div></section>
+    <p id="ver" class="text-xs text-slate-500 text-center"></p>
   </div>
 </div>
 
@@ -155,6 +157,7 @@ ghorInfo.forEach(([a,ml,mr])=>[ml,mr].forEach(sm=>{
 }));
 
 // ---------- Settings & state ----------
+const VERSION='v7';
 const NAMES=['Player 1','Player 2'];
 const DEF={n:[12,12],c:['#2563eb','#22c55e'],ban:'center',noCorner:true,ghor:true,outOfSpots:true,capOnly:true,chain:true,trap:false,must:false};
 let S;
@@ -196,7 +199,7 @@ function settle(q){
     const o=1-q,k=st.hand[q];st.cap[o]+=k;st.hand[q]=0;
     const m=`${NAMES[q]} has no place left — ${k} hand token${k>1?'s':''} counted as eaten by ${NAMES[o]}!`;
     log('🔁 '+m);toast(m);
-  }
+  }else if(S.outOfSpots&&st.hand[q]>0&&!placeable())log(`🛡 ${NAMES[q]} has no place left but can capture — hand tokens stay safe.`);
 }
 const lockOf=p=>S.capOnly&&st.hand[p]>0&&(placeable()||anyCap(p));
 const anyCap=p=>tok.some((t,i)=>t===p&&movesOf(i,true).length>0);
@@ -370,6 +373,15 @@ if(typeof window!=='undefined'){
 }
 $('install').onclick=async()=>{if(!dip)return;dip.prompt();try{await dip.userChoice;}catch(e){}dip=null;$('install').classList.add('hidden');};
 if(typeof navigator!=='undefined'&&'serviceWorker' in navigator&&/^https?:/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
+$('ver').textContent='Version '+VERSION;
+$('upd').onclick=async()=>{
+  if(!confirm('Update and reload? The current game will be reset.'))return;
+  try{
+    if(navigator.serviceWorker)(await navigator.serviceWorker.getRegistrations()).forEach(r=>r.unregister());
+    if(window.caches)(await caches.keys()).forEach(k=>caches.delete(k));
+  }catch(e){}
+  location.reload();
+};
 newGame();
 </script>
 </body>
