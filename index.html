@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,39 +8,47 @@
 <style>
   body{background:linear-gradient(135deg,#0f172a,#1e1b4b);min-height:100vh}
   .wood{background:linear-gradient(135deg,#e39b62,#c97b45);border-radius:18px;box-shadow:0 20px 50px #0008;padding:8px}
-  .pc{transition:all .2s;transform-box:fill-box;transform-origin:center}
+  .pc,.hint,.boom{transform-box:fill-box;transform-origin:center}
+  .pc{transition:all .2s}
   .pc.pop{animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
-  .hint{animation:pulse .9s infinite;transform-box:fill-box;transform-origin:center}
+  .hint{animation:pulse .9s infinite}
+  .boom{animation:boom .8s forwards;pointer-events:none}
   @keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
   @keyframes pulse{0%,100%{transform:scale(1);opacity:.95}50%{transform:scale(1.35);opacity:.6}}
+  @keyframes boom{0%{transform:scale(1);opacity:1}100%{transform:scale(3.2);opacity:0}}
+  #toast{transition:all .3s;transform:translate(-50%,-30px);opacity:0;pointer-events:none}
+  #toast.show{transform:translate(-50%,0);opacity:1}
   svg{touch-action:manipulation}
 </style>
 </head>
 <body class="text-slate-100 p-3 sm:p-6">
+<div id="toast" class="fixed top-4 left-1/2 z-50 bg-rose-600 text-white font-bold px-5 py-3 rounded-xl shadow-2xl text-center"></div>
 <div class="max-w-5xl mx-auto">
   <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-1 bg-clip-text text-transparent bg-gradient-to-r from-amber-300 to-pink-400">♟ Chocachol</h1>
-  <p class="text-center text-slate-400 text-sm mb-3">Token boshao → Start → line borabor chalo, opponent-ke lafiye kete dao!</p>
+  <p class="text-center text-slate-400 text-sm mb-3">Place or move tokens, trap the opponent and capture them in bulk!</p>
   <div id="banner" class="rounded-xl text-center font-bold py-2 mb-4 bg-slate-800"></div>
 
   <div class="flex flex-col lg:flex-row gap-5 items-center lg:items-start justify-center">
     <div class="wood w-full" style="max-width:430px"><svg id="svg" viewBox="60 65 450 785" class="w-full h-auto" style="max-height:82vh"></svg></div>
 
-    <div class="w-full max-w-[430px] lg:w-80 space-y-3">
+    <div class="w-full max-w-[430px] lg:w-96 space-y-3">
       <div class="bg-slate-800/80 rounded-2xl p-4">
-        <h2 class="font-bold mb-2">👥 Players &amp; Tokens</h2>
-        <div id="players" class="space-y-2"></div>
-        <p class="text-xs text-slate-400 mt-2">Setup-e kono point-e click korle token boshbe, same point-e abar click korle sorbe. Max 8 token/player.</p>
-        <div class="grid grid-cols-2 gap-2 mt-3">
-          <button id="undo" class="bg-slate-700 hover:bg-slate-600 disabled:opacity-40 rounded-lg py-2 text-sm">↩ Undo last</button>
-          <button id="clearp" class="bg-slate-700 hover:bg-slate-600 disabled:opacity-40 rounded-lg py-2 text-sm">🗑 Clear player</button>
+        <h2 class="font-bold mb-2">⚙ Players &amp; Token Count</h2>
+        <div id="cards" class="space-y-2"></div>
+        <div class="flex flex-wrap items-center gap-2 mt-3 text-sm">
+          <span class="text-slate-400">Quick (both players):</span>
+          <button data-v="12" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">12</button>
+          <button data-v="22" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">22</button>
+          <button data-v="32" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">32</button>
+          <button data-v="36" class="pre bg-slate-700 hover:bg-slate-600 rounded px-3 py-1">36</button>
         </div>
-        <button id="sample" class="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 rounded-lg py-2 text-sm">🧩 Screenshot-er moto sajao</button>
-        <button id="start" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-lg py-2 font-bold">▶ Start Game</button>
-        <button id="endturn" class="hidden w-full mt-2 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg py-2 font-bold">⏭ Turn shesh</button>
+        <p id="err" class="text-rose-400 text-xs mt-2 min-h-[1rem]"></p>
+        <button id="start" class="w-full mt-1 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 rounded-lg py-2 font-bold">▶ Start Game</button>
+        <p class="text-xs text-slate-400 mt-2">Each turn: <b>place</b> a token from your hand on any empty point, <b>or move</b> a board token one step along a line, or jump over an enemy token to capture it. If your placed/landed token leaves a run of enemy tokens in a straight line between it and another of your tokens, <b>all</b> of them are captured at once.</p>
       </div>
       <div class="bg-slate-800/80 rounded-2xl p-4">
         <h2 class="font-bold mb-2">📜 Game Log</h2>
-        <div id="log" class="text-sm space-y-1 h-36 overflow-y-auto"></div>
+        <div id="log" class="text-sm space-y-1 h-40 overflow-y-auto"></div>
       </div>
       <button id="reset" class="w-full bg-rose-600 hover:bg-rose-500 rounded-lg py-2 font-bold">🔄 Reset Game</button>
     </div>
@@ -48,8 +56,8 @@
 </div>
 
 <script>
-// ---------- Board geometry (matches the screenshot) ----------
-const XS=[157,221,283,346,409], YS=[200,327,456,585,713], MAXT=8;
+// ---------- Board geometry ----------
+const XS=[157,221,283,346,409], YS=[200,327,456,585,713], MAXT=36;
 const nodes=[], edges=new Set();
 const gid=(c,r)=>r*5+c;
 for(let r=0;r<5;r++)for(let c=0;c<5;c++)nodes.push({x:XS[c],y:YS[r]});
@@ -70,7 +78,7 @@ tri(gid(0,2),[83,325],[83,585]);   tri(gid(4,2),[485,325],[485,585]);
 tri(gid(0,0),[77,196],[155,80]);   tri(gid(4,0),[490,196],[411,80]);
 tri(gid(0,4),[77,717],[155,835]);  tri(gid(4,4),[490,717],[411,835]);
 
-const NN=nodes.length, adj=Array.from({length:NN},()=>[]), jumps=Array.from({length:NN},()=>[]);
+const NN=nodes.length, adj=Array.from({length:NN},()=>[]), jumps=Array.from({length:NN},()=>[]), nx=Array.from({length:NN},()=>({}));
 edges.forEach(k=>{const [a,b]=k.split('-').map(Number);adj[a].push(b);adj[b].push(a);});
 for(let b=0;b<NN;b++){
   const ns=adj[b];
@@ -78,62 +86,102 @@ for(let b=0;b<NN;b++){
     const a=ns[i],c=ns[j];
     const ux=nodes[a].x-nodes[b].x,uy=nodes[a].y-nodes[b].y,vx=nodes[c].x-nodes[b].x,vy=nodes[c].y-nodes[b].y;
     const cr=Math.abs(ux*vy-uy*vx)/(Math.hypot(ux,uy)*Math.hypot(vx,vy)), dot=ux*vx+uy*vy;
-    if(cr<0.1&&dot<0){jumps[a].push({over:b,to:c});jumps[c].push({over:b,to:a});}
+    if(cr<0.1&&dot<0){jumps[a].push({over:b,to:c});jumps[c].push({over:b,to:a});nx[a][b]=c;nx[c][b]=a;}
   }
 }
 
-// ---------- Game state ----------
+// ---------- State ----------
 const PL=[{n:'Player 1',c:'#2563eb'},{n:'Player 2',c:'#22c55e'}];
-const SAMPLE=[[[0,0],[4,0],[0,2],[1,2],[4,2],[1,3],[3,3],[0,4]],[[2,0],[1,1],[2,1],[3,1],[3,2],[0,3],[2,3]]];
-let tok, order, st, logs;
+let tok, st, logs, toastT;
 const $=id=>document.getElementById(id);
-const log=m=>{logs.unshift(m);if(logs.length>60)logs.pop();};
-const cnt=p=>tok.reduce((s,t)=>s+(t===p),0);
+const log=m=>{logs.unshift(m);if(logs.length>80)logs.pop();};
+const onBoard=p=>tok.reduce((s,t)=>s+(t===p),0);
+const left=p=>st.hand[p]+onBoard(p);
 
 function init(){
-  tok=Array(NN).fill(-1); order=[];
-  st={phase:'setup',sel:0,turn:0,pick:null,chain:false,last:null};
-  logs=[];log('Board khali. Player select kore point-e click kore token boshao.');render();
+  tok=Array(NN).fill(-1);
+  st={phase:'config',turn:0,pick:null,last:null,flash:[],hand:[0,0],cap:[0,0],winner:-2};
+  logs=[];log('Choose the token count for each player, then press Start.');
+  $('err').textContent='';render();
 }
-function movesOf(i,onlyCap){
+
+// ---------- Rules ----------
+function movesOf(i){
   const p=tok[i],r=[];
-  if(!onlyCap)adj[i].forEach(j=>{if(tok[j]<0)r.push({to:j});});
+  adj[i].forEach(j=>{if(tok[j]<0)r.push({to:j});});
   jumps[i].forEach(({over,to})=>{if(tok[over]===1-p&&tok[to]<0)r.push({to,cap:over});});
   return r;
 }
-const anyMove=p=>tok.some((t,i)=>t===p&&movesOf(i).length);
+// Trap capture: from the landing point, in every straight direction, a run of enemy
+// tokens that ends at one of your own tokens is captured entirely.
+function sandwich(L,p){
+  const out=new Set();
+  adj[L].forEach(j=>{
+    const run=[];let prev=L,cur=j;
+    while(cur!==undefined&&tok[cur]===1-p){run.push(cur);const n=nx[prev][cur];prev=cur;cur=n;}
+    if(run.length&&cur!==undefined&&tok[cur]===p)run.forEach(x=>out.add(x));
+  });
+  return out;
+}
+function canAct(p){
+  return (st.hand[p]>0&&tok.some(t=>t<0))||tok.some((t,i)=>t===p&&movesOf(i).length>0);
+}
 
 function click(n){
-  if(st.phase==='setup'){
-    const p=st.sel;
-    if(tok[n]===p){tok[n]=-1;order=order.filter(x=>x!==n);st.last=null;log(`${PL[p].n} er token soranor holo.`);}
-    else if(tok[n]>=0)log('Ei point-e onno player-er token ache.');
-    else if(cnt(p)>=MAXT)log(`${PL[p].n} er max ${MAXT} token already boshano.`);
-    else{tok[n]=p;order.push(n);st.last=n;log(`${PL[p].n} token boshalo.`);}
-  }else if(st.phase==='play'){
-    if(st.pick!==null){
-      const m=movesOf(st.pick,st.chain).find(x=>x.to===n);
-      if(m){doMove(m);render();return;}
+  if(st.phase!=='play')return;
+  st.last=null;st.flash=[];
+  const p=st.turn;
+  if(tok[n]===p){st.pick=st.pick===n?null:n;render();return;}
+  if(tok[n]>=0){render();return;}
+  if(st.pick!==null){
+    const m=movesOf(st.pick).find(x=>x.to===n);
+    if(m){
+      const caps=new Set(m.cap!==undefined?[m.cap]:[]);
+      tok[st.pick]=-1;tok[n]=p;
+      sandwich(n,p).forEach(x=>caps.add(x));
+      finish(n,caps,'moved',m.cap!==undefined?1:0);return;
     }
-    if(!st.chain&&tok[n]===st.turn)st.pick=n;
+  }
+  if(st.hand[p]>0){
+    tok[n]=p;st.hand[p]--;
+    finish(n,sandwich(n,p),'placed',0);return;
+  }
+  st.pick=null;render();
+}
+
+function finish(at,caps,verb,jumped){
+  const p=st.turn,q=1-p,k=caps.size;
+  caps.forEach(i=>tok[i]=-1);
+  st.cap[p]+=k;st.last=at;st.flash=[...caps];st.pick=null;
+  log(`${PL[p].n} ${verb} a token.`);
+  if(k){
+    const detail=jumped&&k>jumped?` (${jumped} by jump + ${k-jumped} by trapping)`:(jumped?' (by jump)':' (by trapping)');
+    const msg=`${PL[p].n} captured ${k} token${k>1?'s':''} in one move!`;
+    log(`💥 ${msg}${detail}`);toast(msg);
+  }
+  if(left(q)===0){st.phase='over';st.winner=p;log(`🏆 ${PL[p].n} wins!`);render();return;}
+  st.turn=q;
+  if(!canAct(q)){
+    log(`${PL[q].n} has no legal action — turn skipped.`);st.turn=p;
+    if(!canAct(p)){st.phase='over';st.winner=-1;log('🤝 No one can move — draw!');}
   }
   render();
 }
-function doMove(m){
-  tok[m.to]=st.turn;tok[st.pick]=-1;st.last=m.to;
-  if(m.cap!==undefined){
-    tok[m.cap]=-1;log(`💥 ${PL[st.turn].n} opponent-er token kete dilo!`);
-    if(cnt(1-st.turn)===0){st.phase='over';st.pick=null;st.chain=false;log(`🏆 ${PL[st.turn].n} jitse gelo!`);return;}
-    if(movesOf(m.to,true).length){st.pick=m.to;st.chain=true;log('Abar capture korte paro, ba "Turn shesh" chapo.');return;}
-  }
-  endTurn();
+
+function toast(m){
+  const t=$('toast');t.textContent='💥 '+m;t.classList.add('show');
+  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2600);
 }
-function endTurn(){
-  st.pick=null;st.chain=false;st.turn=1-st.turn;
-  if(!anyMove(st.turn)){
-    log(`${PL[st.turn].n} er chalar jaiga nei, turn skip.`);st.turn=1-st.turn;
-    if(!anyMove(st.turn)){st.phase='over';st.turn=-1;log('🤝 Draw!');}
+
+function start(){
+  const a=Number($('n0').value),b=Number($('n1').value);
+  if(!Number.isInteger(a)||!Number.isInteger(b)||a<1||b<1||a>MAXT||b>MAXT||a+b>NN-1){
+    $('err').textContent=`Enter whole numbers from 1 to ${MAXT} for each player (together at most ${NN-1}; the board has ${NN} points).`;return;
   }
+  $('err').textContent='';
+  st.hand=[a,b];st.phase='play';st.turn=0;
+  log(`Game started: ${a} tokens for ${PL[0].n}, ${b} for ${PL[1].n}. ${PL[0].n} goes first.`);
+  render();
 }
 
 // ---------- Rendering ----------
@@ -141,60 +189,59 @@ function render(){
   let h='';
   edges.forEach(k=>{const [a,b]=k.split('-').map(Number);h+=`<line x1="${nodes[a].x}" y1="${nodes[a].y}" x2="${nodes[b].x}" y2="${nodes[b].y}" stroke="#111" stroke-width="2.6" stroke-linecap="round"/>`;});
   nodes.forEach(n=>h+=`<circle cx="${n.x}" cy="${n.y}" r="3.5" fill="#111"/>`);
-  const hints=(st.phase==='play'&&st.pick!==null)?movesOf(st.pick,st.chain):[];
-  hints.forEach(m=>{const n=nodes[m.to];h+=`<circle class="hint" cx="${n.x}" cy="${n.y}" r="9" fill="${m.cap!==undefined?'#ef4444':'#facc15'}" stroke="#111" stroke-width="1.5"/>`;});
+  const hints=(st.phase==='play'&&st.pick!==null)?movesOf(st.pick):[];
+  hints.forEach(m=>{const n=nodes[m.to];h+=`<circle class="hint" cx="${n.x}" cy="${n.y}" r="8" fill="${m.cap!==undefined?'#ef4444':'#facc15'}" stroke="#111" stroke-width="1.5"/>`;});
   tok.forEach((t,i)=>{if(t<0)return;const n=nodes[i];
-    h+=`<circle class="pc${st.last===i?' pop':''}" cx="${n.x}" cy="${n.y}" r="14" fill="${PL[t].c}" stroke="#fff" stroke-width="3"/>`;
-    if(st.pick===i)h+=`<circle cx="${n.x}" cy="${n.y}" r="20" fill="none" stroke="#fde047" stroke-width="3.5" stroke-dasharray="6 4"/>`;});
-  nodes.forEach((n,i)=>h+=`<circle data-n="${i}" cx="${n.x}" cy="${n.y}" r="17" fill="transparent" style="cursor:pointer"/>`);
+    h+=`<circle class="pc${st.last===i?' pop':''}" cx="${n.x}" cy="${n.y}" r="12" fill="${PL[t].c}" stroke="#fff" stroke-width="2.5"/>`;
+    if(st.pick===i)h+=`<circle cx="${n.x}" cy="${n.y}" r="17" fill="none" stroke="#fde047" stroke-width="3" stroke-dasharray="5 4"/>`;});
+  st.flash.forEach(i=>h+=`<circle class="boom" cx="${nodes[i].x}" cy="${nodes[i].y}" r="12" fill="none" stroke="#ef4444" stroke-width="4"/>`);
+  nodes.forEach((n,i)=>h+=`<circle data-n="${i}" cx="${n.x}" cy="${n.y}" r="15" fill="transparent" style="cursor:pointer"/>`);
   $('svg').innerHTML=h;
 
+  const cfg=st.phase==='config';
   PL.forEach((p,i)=>{
-    const row=$('prow'+i),active=st.phase==='setup'?st.sel===i:st.turn===i;
-    row.style.borderColor=active?p.c:'transparent';row.style.background=active?p.c+'33':'#1e293b';
-    $('cnt'+i).textContent=cnt(i)+'/'+MAXT;
+    const active=st.phase==='play'&&st.turn===i, c=$('card'+i);
+    c.style.borderColor=active?p.c:'transparent';c.style.background=active?p.c+'33':'#1e293b';
+    $('n'+i).disabled=!cfg;$('col'+i).disabled=!cfg;
+    $('left'+i).innerHTML=cfg?'—':`${left(i)} <span class="text-xs font-normal text-slate-300">left</span>`;
+    $('st'+i).textContent=cfg?'':`Hand ${st.hand[i]} • Board ${onBoard(i)} • Captured ${st.cap[i]}`;
   });
-  const bn=$('banner'),pi=st.phase==='setup'?st.sel:st.turn,p=PL[pi]||{n:'',c:'#94a3b8'};
-  if(st.phase==='setup')bn.innerHTML=`🛠 Setup: <span style="color:${p.c}">● ${p.n}</span> er token boshao`;
-  else if(st.phase==='over')bn.innerHTML=st.turn<0?'🤝 Draw!':`🏆 <span style="color:${p.c}">● ${p.n}</span> jitse!`;
-  else bn.innerHTML=`Ekhon <span style="color:${p.c}">● ${p.n}</span> er turn — ${st.pick===null?'token select koro':'jaiga select koro'}`;
-  bn.style.border='2px solid '+p.c;
-  const setup=st.phase==='setup';
-  ['start','undo','clearp','sample'].forEach(id=>$(id).disabled=!setup);
-  $('endturn').classList.toggle('hidden',!st.chain);
+  const bn=$('banner'),pl=PL[st.phase==='play'?st.turn:0];
+  if(cfg){bn.textContent='Set the token counts and press Start';bn.style.border='2px solid #475569';}
+  else if(st.phase==='over'){
+    bn.innerHTML=st.winner<0?'🤝 Draw!':`🏆 <span style="color:${PL[st.winner].c}">● ${PL[st.winner].n}</span> wins!`;
+    bn.style.border='2px solid '+(st.winner<0?'#94a3b8':PL[st.winner].c);
+  }else{
+    const p=st.turn;
+    bn.innerHTML=`<span style="color:${pl.c}">● ${pl.n}</span>'s turn — ${st.pick!==null?'choose where to move':(st.hand[p]>0?'place a token ('+st.hand[p]+' in hand) or pick one to move':'pick a token to move')}`;
+    bn.style.border='2px solid '+pl.c;
+  }
+  $('start').disabled=!cfg;
   $('log').innerHTML=logs.map(m=>`<div class="border-l-2 border-slate-600 pl-2">${m}</div>`).join('');
 }
 
-function buildPlayers(){
-  const box=$('players');
+function buildCards(){
+  const box=$('cards');
   PL.forEach((p,i)=>{
-    const row=document.createElement('div');row.id='prow'+i;
-    row.className='flex items-center gap-2 p-2 rounded-xl border-2 cursor-pointer transition';
-    row.innerHTML=`<input type="color" value="${p.c}" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0"><span class="flex-1 font-semibold text-sm">${p.n}</span><span id="cnt${i}" class="text-xs bg-slate-700 rounded-full px-2 py-1">0/${MAXT}</span>`;
-    row.onclick=e=>{if(e.target.tagName==='INPUT')return;if(st.phase==='setup'){st.sel=i;render();}};
-    row.querySelector('input').oninput=e=>{p.c=e.target.value;render();};
-    box.appendChild(row);
+    const d=document.createElement('div');d.id='card'+i;
+    d.className='p-2 rounded-xl border-2 transition';
+    d.innerHTML=`<div class="flex items-center gap-2">
+      <input id="col${i}" type="color" value="${p.c}" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0">
+      <span class="flex-1 font-semibold text-sm">${p.n}</span>
+      <label class="text-xs text-slate-400">Tokens</label>
+      <input id="n${i}" type="number" min="1" max="${MAXT}" value="${i?12:12}" class="w-16 bg-slate-700 rounded px-2 py-1 text-center">
+      <span id="left${i}" class="text-lg font-bold w-16 text-right">—</span></div>
+      <div id="st${i}" class="text-xs text-slate-400 mt-1"></div>`;
+    box.appendChild(d);
+    d.querySelector('input[type=color]').oninput=e=>{p.c=e.target.value;render();};
   });
 }
 
 $('svg').addEventListener('click',e=>{const t=e.target.closest('[data-n]');if(t)click(+t.dataset.n);});
-$('start').onclick=()=>{
-  if(!cnt(0)||!cnt(1)){log('⚠ Duijon player-ei kombokhomo 1-ta token boshao.');render();return;}
-  st.phase='play';st.turn=0;st.pick=null;st.last=null;log(`Game shuru! ${PL[0].n} prothome.`);render();
-};
-$('endturn').onclick=()=>{endTurn();render();};
-$('undo').onclick=()=>{
-  for(let k=order.length-1;k>=0;k--)if(tok[order[k]]===st.sel){tok[order[k]]=-1;order.splice(k,1);break;}
-  st.last=null;render();
-};
-$('clearp').onclick=()=>{tok=tok.map(t=>t===st.sel?-1:t);order=order.filter(i=>tok[i]>=0);st.last=null;render();};
-$('sample').onclick=()=>{
-  tok.fill(-1);order=[];
-  SAMPLE.forEach((list,p)=>list.forEach(([c,r])=>{tok[gid(c,r)]=p;order.push(gid(c,r));}));
-  st.last=null;log('Screenshot-er layout sajano holo (Player 1: 8, Player 2: 7).');render();
-};
-$('reset').onclick=()=>{if(confirm('Pura game reset korbe?'))init();};
-buildPlayers();init();
+document.querySelectorAll('.pre').forEach(b=>b.onclick=()=>{if(st.phase==='config'){$('n0').value=b.dataset.v;$('n1').value=b.dataset.v;}});
+$('start').onclick=start;
+$('reset').onclick=()=>{if(confirm('Reset the whole game?'))init();};
+buildCards();init();
 </script>
 </body>
 </html>
