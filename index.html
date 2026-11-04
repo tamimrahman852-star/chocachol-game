@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chocachol – Board Game</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{background:linear-gradient(135deg,#0f172a,#1e1b4b);min-height:100vh}
+  .board{display:grid;grid-template-columns:repeat(8,1fr);gap:3px;width:min(94vw,560px);aspect-ratio:1;padding:6px;background:#1e293b;border-radius:18px;box-shadow:0 20px 50px #0008}
+  .cell{position:relative;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:2px;border-radius:8px;cursor:pointer;transition:transform .15s,filter .15s}
+  .cell:hover{filter:brightness(1.25);transform:scale(1.04)}
+  .cell .num{position:absolute;top:1px;left:3px;font-size:clamp(7px,1.8vw,10px);opacity:.55;color:#e2e8f0}
+  .tok{width:42%;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(9px,2.4vw,16px);color:#fff;border:2px solid #fff;box-shadow:0 2px 6px #0007;z-index:1;transition:all .2s}
+  .tok.pop{animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+  .tok.can{animation:pulse 0.9s infinite;cursor:pointer}
+  @keyframes pop{0%{transform:scale(0) rotate(-180deg)}100%{transform:scale(1) rotate(0)}}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 #fde047cc}50%{box-shadow:0 0 0 7px #fde04700}}
+  .dice{font-size:4.5rem;line-height:1;transition:transform .1s}
+  .rolling{animation:shake .15s infinite}
+  @keyframes shake{0%{transform:rotate(-14deg) scale(1.1)}50%{transform:rotate(14deg) scale(.95)}100%{transform:rotate(-14deg) scale(1.1)}}
+</style>
+</head>
+<body class="text-slate-100 p-3 sm:p-6">
+<div class="max-w-5xl mx-auto">
+  <h1 class="text-3xl sm:text-4xl font-extrabold text-center mb-1 bg-clip-text text-transparent bg-gradient-to-r from-amber-300 to-pink-400">🎲 Chocachol</h1>
+  <p class="text-center text-slate-400 text-sm mb-4">Token boshao → Start → dice ghurao → 64-e prothome pouchao!</p>
+
+  <div id="banner" class="rounded-xl text-center font-bold py-2 mb-4 bg-slate-800"></div>
+
+  <div class="flex flex-col lg:flex-row gap-5 items-center lg:items-start justify-center">
+    <div id="board" class="board"></div>
+
+    <div class="w-full max-w-[560px] lg:w-80 space-y-3">
+      <div class="bg-slate-800/80 rounded-2xl p-4">
+        <h2 class="font-bold mb-2">👥 Players &amp; Tokens</h2>
+        <div id="players" class="space-y-2"></div>
+        <p class="text-xs text-slate-400 mt-2">Setup-e cell-e click korle token boshbe; same cell-e abar click korle sorbe. Max 3 token/player.</p>
+        <div class="flex gap-2 mt-3">
+          <button id="undo" class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-2 text-sm">↩ Undo last</button>
+          <button id="clearp" class="flex-1 bg-slate-700 hover:bg-slate-600 rounded-lg py-2 text-sm">🗑 Clear player</button>
+        </div>
+        <button id="start" class="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg py-2 font-bold">▶ Start Game</button>
+      </div>
+
+      <div class="bg-slate-800/80 rounded-2xl p-4 text-center">
+        <div id="dice" class="dice">⚀</div>
+        <button id="roll" class="mt-2 w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-slate-900 rounded-lg py-2 font-extrabold">🎲 Roll Dice</button>
+      </div>
+
+      <div class="bg-slate-800/80 rounded-2xl p-4">
+        <h2 class="font-bold mb-2">📜 Game Log</h2>
+        <div id="log" class="text-sm space-y-1 h-36 overflow-y-auto"></div>
+      </div>
+
+      <button id="reset" class="w-full bg-rose-600 hover:bg-rose-500 rounded-lg py-2 font-bold">🔄 Reset Game</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const N = 64, COLS = 8, MAXT = 3;
+const SYMS = ['●','★','♦','▲','♞','♥','☀','⚡'];
+const PL = [
+  {n:'Player 1', c:'#ef4444', s:'●'},
+  {n:'Player 2', c:'#3b82f6', s:'★'},
+  {n:'Player 3', c:'#22c55e', s:'♦'},
+  {n:'Player 4', c:'#f59e0b', s:'▲'}
+];
+let st, logs, lastPlaced = null;
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function init() {
+  st = {phase:'setup', sel:0, turn:0, dice:null, busy:false, tokens: PL.map(() => [])};
+  logs = [];
+  lastPlaced = null;
+  $('dice').textContent = '⚀';
+  log('Board khali. Player select kore cell-e click kore token boshao.');
+  render();
+}
+
+function log(m) { logs.unshift(m); if (logs.length > 60) logs.pop(); }
+
+function cellNum(r, c) {
+  const br = 7 - r;
+  return br % 2 === 0 ? br * COLS + c + 1 : br * COLS + (7 - c) + 1;
+}
+
+function activePlayers() { return PL.map((_, i) => i).filter(i => st.tokens[i].length); }
+
+function buildPlayers() {
+  const box = $('players');
+  box.innerHTML = '';
+  PL.forEach((p, i) => {
+    const row = document.createElement('div');
+    row.id = 'prow' + i;
+    row.className = 'flex items-center gap-2 p-2 rounded-xl border-2 cursor-pointer transition';
+    row.innerHTML = `<input type="color" value="${p.c}" class="w-8 h-8 rounded cursor-pointer bg-transparent border-0">
+      <select class="bg-slate-700 rounded p-1 text-lg">${SYMS.map(s => `<option ${s===p.s?'selected':''}>${s}</option>`).join('')}</select>
+      <span class="flex-1 font-semibold text-sm">${p.n}</span>
+      <span id="cnt${i}" class="text-xs bg-slate-700 rounded-full px-2 py-1">0/${MAXT}</span>`;
+    row.onclick = e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return; if (st.phase === 'setup') { st.sel = i; render(); } };
+    row.querySelector('input').oninput = e => { p.c = e.target.value; render(); };
+    row.querySelector('select').onchange = e => { p.s = e.target.value; render(); };
+    box.appendChild(row);
+  });
+}
+
+function movable(p, val) {
+  return st.tokens[p].map((pos, idx) => ({pos, idx})).filter(t => t.pos < N && t.pos + val <= N);
+}
+
+function render() {
+  // board
+  const b = $('board');
+  b.innerHTML = '';
+  const cur = st.turn;
+  const canIdx = (st.phase === 'move') ? movable(cur, st.dice).map(t => t.pos) : [];
+  for (let r = 0; r < COLS; r++) for (let c = 0; c < COLS; c++) {
+    const n = cellNum(r, c);
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.style.background = n === 64 ? 'linear-gradient(135deg,#f59e0b,#ec4899)' : n === 1 ? '#0d9488' : ((r + c) % 2 ? '#334155' : '#475569');
+    d.innerHTML = `<span class="num">${n === 64 ? '🏁 64' : n === 1 ? 'START 1' : n}</span>`;
+    d.onclick = () => cellClick(n);
+    PL.forEach((p, i) => st.tokens[i].forEach(pos => {
+      if (pos !== n) return;
+      const t = document.createElement('div');
+      t.className = 'tok' + (lastPlaced && lastPlaced[0] === i && lastPlaced[1] === n ? ' pop' : '') + (st.phase === 'move' && i === cur && canIdx.includes(n) ? ' can' : '');
+      t.style.background = p.c;
+      t.textContent = p.s;
+      d.appendChild(t);
+    }));
+    b.appendChild(d);
+  }
+  // panel
+  PL.forEach((p, i) => {
+    const row = $('prow' + i);
+    row.style.borderColor = (st.phase === 'setup' ? st.sel === i : (st.phase !== 'over' && st.turn === i)) ? p.c : 'transparent';
+    row.style.background = (st.phase === 'setup' ? st.sel === i : st.turn === i) ? p.c + '22' : '#1e293b';
+    $('cnt' + i).textContent = st.tokens[i].length + '/' + MAXT;
+  });
+  // banner
+  const bn = $('banner');
+  const p = PL[st.phase === 'setup' ? st.sel : st.turn];
+  if (st.phase === 'setup') bn.innerHTML = `🛠 Setup: <span style="color:${p.c}">${p.s} ${p.n}</span> er token boshao`;
+  else if (st.phase === 'over') bn.innerHTML = `🏆 <span style="color:${p.c}">${p.s} ${p.n}</span> jitse!`;
+  else bn.innerHTML = `Ekhon <span style="color:${p.c}">${p.s} ${p.n}</span> er turn ${st.phase === 'move' ? '— token select koro' : '— dice ghurao'}`;
+  bn.style.border = '2px solid ' + p.c;
+  // buttons
+  $('roll').disabled = !(st.phase === 'roll' && !st.busy);
+  $('start').disabled = st.phase !== 'setup';
+  $('undo').disabled = $('clearp').disabled = st.phase !== 'setup';
+  $('log').innerHTML = logs.map(m => `<div class="border-l-2 border-slate-600 pl-2">${m}</div>`).join('');
+}
+
+function cellClick(n) {
+  if (st.phase === 'setup') {
+    const t = st.tokens[st.sel], i = t.indexOf(n), p = PL[st.sel];
+    if (i >= 0) { t.splice(i, 1); lastPlaced = null; log(`${p.n} er token ${n} number cell theke soranor holo.`); }
+    else if (n === N) log('🏁 Finish cell-e token boshano jabe na.');
+    else if (t.length >= MAXT) log(`${p.n} er max ${MAXT} token already boshano ache.`);
+    else { t.push(n); lastPlaced = [st.sel, n]; log(`${p.n} token boshalo cell ${n}-e.`); }
+    render();
+  } else if (st.phase === 'move' && !st.busy) {
+    const m = movable(st.turn, st.dice).find(t => t.pos === n);
+    if (m) doMove(st.turn, m.idx, st.dice);
+  }
+}
+
+function startGame() {
+  if (activePlayers().length < 2) { log('⚠ Kombokhomo 2 jon player-er token boshao.'); render(); return; }
+  st.phase = 'roll';
+  st.turn = activePlayers()[0];
+  lastPlaced = null;
+  log('Game shuru! ' + PL[st.turn].n + ' prothome.');
+  render();
+}
+
+async function rollDice() {
+  if (st.phase !== 'roll' || st.busy) return;
+  st.busy = true; render();
+  const el = $('dice');
+  el.classList.add('rolling');
+  for (let k = 0; k < 9; k++) { el.textContent = String.fromCharCode(0x267F + 1 + Math.floor(Math.random() * 6)); await sleep(70); }
+  el.classList.remove('rolling');
+  const v = 1 + Math.floor(Math.random() * 6);
+  el.textContent = String.fromCharCode(0x267F + v);
+  st.dice = v;
+  log(`${PL[st.turn].n} dice-e peyeche <b>${v}</b>.`);
+  const m = movable(st.turn, v);
+  if (!m.length) { log('Kono token chalano jacche na, turn skip.'); render(); await sleep(700); nextTurn(); return; }
+  if (m.length === 1 || new Set(m.map(t => t.pos)).size === 1) { render(); await sleep(450); doMove(st.turn, m[0].idx, v); return; }
+  st.phase = 'move'; st.busy = false; render();
+}
+
+async function doMove(p, idx, v) {
+  st.busy = true; st.phase = 'moving'; render();
+  for (let k = 0; k < v; k++) { st.tokens[p][idx]++; render(); await sleep(170); }
+  const pos = st.tokens[p][idx];
+  if (pos < N) PL.forEach((q, j) => { if (j !== p) st.tokens[j].forEach((x, y) => { if (x === pos) { st.tokens[j][y] = 1; log(`💥 ${PL[p].n} ${q.n} er token-ke ${pos} theke START-e pathalo!`); } }); });
+  if (pos === N) log(`🏁 ${PL[p].n} er ekta token finish-e pouchalo!`);
+  if (st.tokens[p].every(x => x === N)) { st.phase = 'over'; st.busy = false; log(`🏆 ${PL[p].n} jitse gelo!`); render(); return; }
+  if (v === 6) { log('🎉 6 peyecho, abar chal dao!'); st.phase = 'roll'; st.busy = false; render(); return; }
+  nextTurn();
+}
+
+function nextTurn() {
+  const a = activePlayers();
+  let i = a.indexOf(st.turn);
+  st.turn = a[(i + 1) % a.length];
+  st.phase = 'roll'; st.busy = false;
+  render();
+}
+
+$('start').onclick = startGame;
+$('roll').onclick = rollDice;
+$('reset').onclick = () => { if (confirm('Pura game reset korbe?')) init(); };
+$('undo').onclick = () => { const t = st.tokens[st.sel]; if (t.length) { const x = t.pop(); lastPlaced = null; log(`${PL[st.sel].n} er last token (${x}) soranor holo.`); render(); } };
+$('clearp').onclick = () => { st.tokens[st.sel] = []; lastPlaced = null; log(`${PL[st.sel].n} er shob token muche felа holo.`); render(); };
+
+buildPlayers();
+init();
+</script>
+</body>
+</html>
